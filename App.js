@@ -1,48 +1,54 @@
 import React from 'react';
-import { StyleSheet, Text, View, Animated, Easing, TouchableWithoutFeedback } from 'react-native';
+import { StyleSheet, Text, View, Animated, PanResponder } from 'react-native';
 
 export default class App extends React.Component {
 
   constructor(props) {
     super(props);
-
-    this.handlePressIn = this.handlePressIn.bind(this);
-    this.handlePressOut = this.handlePressOut.bind(this);
   }
 
   componentWillMount() {
-    this.animatedValue = new Animated.Value(1);
+    this.animatedValue = new Animated.ValueXY();
+    this._value = { x: 0, y: 0 };
+    this.animatedValue.addListener((value)  => this._value = value);
+
+    this.pandResponder = PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => true,
+      onMoveShouldSetPanResponder: (evt, gestureState)  => true,
+      onPanResponderGrant: (e, gestureState) => {
+        this.animatedValue.setOffset({
+          x: this._value.x,
+          y: this._value.y
+        });
+
+        this.animatedValue.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([
+        null,
+        { dx: this.animatedValue.x, dy: this.animatedValue.y }
+      ]),
+      onPanResponderRelease: (e, gestureState)  => {
+        this.animatedValue.flattenOffset();
+        Animated.decay(this.animatedValue, {
+          deceleration: 0.997,
+          velocity: { x: gestureState.vx, y: gestureState.vy }
+        }).start();
+      }
+    });
+
   }
 
-  handlePressIn() {
-    Animated.spring(this.animatedValue, {
-      toValue: 0.5,
-    }).start();
-  }
-
-  handlePressOut() {
-    Animated.spring(this.animatedValue, {
-      toValue: 1,
-      friction: 3,
-      tension: 40 
-    }).start();
-  }
 
   render() {
     const animatedStyle = { 
-      transform: [{ scale: this.animatedValue }]
+      transform: this.animatedValue.getTranslateTransform()
     };
 
     return (
       <View style={styles.container}>
-        <TouchableWithoutFeedback
-          onPressIn={this.handlePressIn}
-          onPressOut={this.handlePressOut}
-        >
-          <Animated.View style={[styles.box, animatedStyle]}>
-              <Text style={styles.text}>Press me</Text>
+          <Animated.View style={[styles.box, animatedStyle]} { ...this.pandResponder.panHandlers }>
+              <Text style={styles.text}>Drag me</Text>
           </Animated.View>
-        </TouchableWithoutFeedback>
       </View>
     );
   }
@@ -56,12 +62,13 @@ const styles = StyleSheet.create({
   },
   box: {
     width: 100,
-    height: 50,
+    height: 100,
     backgroundColor: '#333',
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: {
     color: '#FFF',
+    fontSize: 16
   }
 });
